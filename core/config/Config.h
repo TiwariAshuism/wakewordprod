@@ -41,7 +41,7 @@ struct VadConfig {
 struct DetectConfig {
   int stage1WindowFrames = 100;   // log-Mel frames per Stage-1 inference window (~1 s)
   int stage1HopFrames = 10;       // slide the window every N frames
-  float stage1Threshold = 0.45f;  // Stage-1 gate (kept low-ish for recall on marginal live
+  float stage1Threshold = 0.35f;  // Stage-1 gate (kept low-ish for recall on marginal live
                                   // scores); Stage-2 cascade below does the FA filtering.
   int stage1ConsecutiveWindows = 1;  // require M consecutive positive windows before firing
                                      // (M=1 for the hey-aura model: on-device live speech scores

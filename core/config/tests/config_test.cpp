@@ -35,7 +35,7 @@ TEST(Config, PlatformOverlayApplied) {
 TEST(Config, RuntimeOverridePublishesAndNotifies) {
   ConfigProvider provider;
   auto before = provider.current();
-  EXPECT_NEAR(before->detect.stage1Threshold, 0.45f, 1e-6);
+  EXPECT_NEAR(before->detect.stage1Threshold, 0.35f, 1e-6);
 
   int fired = 0;
   float seen = 0.0f;
@@ -51,7 +51,7 @@ TEST(Config, RuntimeOverridePublishesAndNotifies) {
   EXPECT_NEAR(seen, 0.7f, 1e-6);
   EXPECT_NEAR(after->detect.stage1Threshold, 0.7f, 1e-6);
   EXPECT_NE(before.get(), after.get());                 // new immutable snapshot
-  EXPECT_NEAR(before->detect.stage1Threshold, 0.45f, 1e-6);  // old snapshot unchanged
+  EXPECT_NEAR(before->detect.stage1Threshold, 0.35f, 1e-6);  // old snapshot unchanged
 }
 
 TEST(Config, OverrideWinsOverOverlay) {

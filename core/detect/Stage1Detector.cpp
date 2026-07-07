@@ -118,6 +118,11 @@ void Stage1Detector::runStage1(uint64_t timestampNanos) {
   }
   lastScore_ = scoreFromOutput(out.value(), cfg_.stage1NumClasses, cfg_.stage1TargetClass);
   lastTs_ = timestampNanos;
+  {  // TEMP: Stage-1 score per gated window (diagnose live-voice recall) — remove after
+    common::ScopedAllowAllocGuard allow;
+    char dbg[48]; std::snprintf(dbg, sizeof(dbg), "s1=%.3f", lastScore_);
+    Log(LogLevel::kInfo, LogCategory::kDetect, dbg, currentId_);
+  }
 
   // Posterior smoothing: a single window over threshold is not enough — require M
   // consecutive positive windows (classic KWS posterior handling). This suppresses
