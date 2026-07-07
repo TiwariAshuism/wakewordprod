@@ -1,0 +1,135 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "version": 1,
+  "metadata": {
+    "component": {
+      "type": "application",
+      "name": "aura",
+      "version": "0.1.0"
+    },
+    "toolchain": {
+      "JDK": "17",
+      "GRADLE": "8.11.1",
+      "AGP": "8.7.2",
+      "KOTLIN": "2.0.21",
+      "NDK": "27.2.12479018",
+      "CMAKE": "3.22.1"
+    },
+    "note": "SBOM is generated from gradle/libs.versions.toml + tools/versions.txt. Oboe + ONNX Runtime are consumed as pinned Prefab AARs (not vendored). The KWS model is a PLACEHOLDER trained on Speech Commands, not shipped."
+  },
+  "components": [
+    {
+      "type": "application",
+      "name": "com.microsoft.onnxruntime:onnxruntime-android",
+      "version": "1.20.0",
+      "kind": "native-runtime",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:maven/com.microsoft.onnxruntime"
+    },
+    {
+      "type": "application",
+      "name": "com.google.oboe:oboe",
+      "version": "1.9.0",
+      "kind": "native-audio",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:maven/com.google.oboe"
+    },
+    {
+      "type": "library",
+      "name": "org.jetbrains.kotlinx:kotlinx-coroutines",
+      "version": "1.9.0",
+      "kind": "library",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:maven/org.jetbrains.kotlinx"
+    },
+    {
+      "type": "library",
+      "name": "androidx.core:core-ktx",
+      "version": "1.13.1",
+      "kind": "library",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:maven/androidx.core"
+    },
+    {
+      "type": "library",
+      "name": "googletest",
+      "version": "1.14.0",
+      "kind": "test",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ],
+      "purl": "pkg:github/google/googletest"
+    },
+    {
+      "type": "application",
+      "name": "silero-vad (silero_vad.onnx)",
+      "version": "master",
+      "kind": "model",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:github/snakers4/silero-vad"
+    },
+    {
+      "type": "library",
+      "name": "fft (self-contained radix-2, placeholder for KissFFT)",
+      "version": "n/a",
+      "kind": "dsp",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ],
+      "purl": "n/a"
+    },
+    {
+      "type": "application",
+      "name": "Google Speech Commands v2 (placeholder training data)",
+      "version": "v0.02",
+      "kind": "dataset",
+      "licenses": [
+        {
+          "license": {
+            "id": "CC-BY-4.0"
+          }
+        }
+      ],
+      "purl": "pkg:other/speech_commands_v0.02"
+    }
+  ]
+}

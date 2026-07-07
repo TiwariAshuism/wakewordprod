@@ -1,0 +1,15 @@
+# PROJECT AURA — ignores
+build/
+.gradle/
+.cxx/
+*.o
+*.exe
+local.properties
+.idea/
+# Placeholder model binaries are not committed; generate via tools/ (see
+# apps/android/src/main/assets/models/README.md)
+apps/android/src/main/assets/models/*.onnx
+apps/android/src/main/assets/models/*.pt
+# Speech Commands dataset (~2.3GB) downloaded by tools/train_kws_model.py
+.data/
+# NOTE: gradle/wrapper/gradle-wrapper.jar IS committed (v1) — do not ignore *.jar

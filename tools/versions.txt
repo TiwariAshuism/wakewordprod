@@ -1,0 +1,18 @@
+# PROJECT AURA — pinned toolchain versions (Stage 9 §1; tools/doctor.sh checks
+# the local environment against this file). Concrete numbers are a v0 judgment
+# call — the SAS defers every version to this file (flagged in REPORT.md).
+JDK=17
+GRADLE=8.11.1
+AGP=8.7.2
+KOTLIN=2.0.21
+NDK=27.2.12479018
+CMAKE=3.22.1
+COMPILE_SDK=35
+MIN_SDK=26
+TARGET_SDK=35
+CXX_STANDARD=20
+# Native third-party (consumed as Prefab AARs, not vendored — see REPORT.md)
+OBOE=1.9.0
+ONNXRUNTIME_ANDROID=1.20.0
+# Test
+GOOGLETEST=1.14.0

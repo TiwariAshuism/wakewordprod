@@ -1,0 +1,12 @@
+{
+  "expected_outcome": "Confirmed",
+  "expected_events": 1,
+  "wake_word": "marvin",
+  "source": "synthetic-placeholder (tools/gen_golden_fixture.py)",
+  "provenance": "generated, NOT a real recording \u2014 placeholder stimulus",
+  "accent": "n/a (synthetic)",
+  "language": "en-US (nominal)",
+  "sample_rate": 16000,
+  "duration_s": 2.1,
+  "note": "Placeholder fixture for the v0 vertical slice; replace with a real labelled recording once the AURA-trained model exists."
+}

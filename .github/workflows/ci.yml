@@ -1,0 +1,78 @@
+# PROJECT AURA — CI (Stage 7 §15 / §18). Per-commit: dependency-graph lint -> host
+# build+tests -> front-end alignment -> ASan -> SBOM; plus a best-effort Android
+# assembleDebug (Acceptance #1). Nightly lanes (HIL, benchmark, 7-day soak) are separate.
+name: aura-ci
+
+on:
+  push: { branches: [ main, master ] }
+  pull_request: {}
+
+jobs:
+  dep-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      # Stage 7 §2 row/PAL/cycle linter runs first — a forbidden import fails in seconds.
+      - run: python tools/lint_deps.py core
+
+  host-tests:
+    runs-on: ubuntu-latest
+    needs: dep-lint
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install CMake/Ninja
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build
+      - name: Configure + build (host-debug, GoogleTest)
+        run: cmake --preset host-debug && cmake --build --preset host-debug
+      - name: Run unit + golden + integration tests
+        run: ctest --preset host-debug --output-on-failure
+
+  frontend-alignment:
+    runs-on: ubuntu-latest
+    needs: dep-lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install numpy scipy
+      - name: Build dump_frontend + verify numpy == C++
+        run: |
+          g++ -std=c++20 -I. -O2 tools/dump_frontend.cpp core/dsp/DspChain.cpp \
+              core/features/LogMelExtractor.cpp -o /tmp/dump_frontend
+          PYTHONPATH=tools python tools/verify_frontend_alignment.py /tmp/dump_frontend
+
+  asan:
+    runs-on: ubuntu-latest
+    needs: dep-lint
+    steps:
+      - uses: actions/checkout@v4
+      - name: Leak/UAF via AddressSanitizer (Stage 7 §14)
+        run: bash tools/run_asan.sh
+
+  sbom:
+    runs-on: ubuntu-latest
+    needs: dep-lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: python tools/gen_sbom.py --out sbom.json
+      - uses: actions/upload-artifact@v4
+        with: { name: sbom, path: sbom.json }
+
+  android-build:
+    runs-on: ubuntu-latest
+    needs: [ host-tests, frontend-alignment ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }   # JDK 17 (AGP 8.7 requires it)
+      - uses: android-actions/setup-android@v3
+      - name: Install NDK + CMake
+        run: sdkmanager "ndk;27.2.12479018" "cmake;3.22.1"
+      - name: assembleDebug (Acceptance #1)
+        # Placeholder models are git-ignored; the app degrades gracefully if absent, so the
+        # APK still assembles. A real run places kws_marvin*.onnx + silero_vad.onnx first.
+        run: ./gradlew :apps:android:assembleDebug
