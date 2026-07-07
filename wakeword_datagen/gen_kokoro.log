@@ -1,0 +1,17 @@
+[voices] 32: ['af_alloy', 'af_aoede', 'af_bella', 'af_heart', 'af_jessica', 'af_kore', 'af_nicole', 'af_nova', 'af_river', 'af_sarah', 'af_sky', 'am_adam', 'am_echo', 'am_eric', 'am_fenrir', 'am_liam', 'am_michael', 'am_onyx', 'am_puck', 'am_santa', 'bf_alice', 'bf_emma', 'bf_isabella', 'bf_lily', 'bm_daniel', 'bm_fable', 'bm_george', 'bm_lewis', 'hf_alpha', 'hf_beta', 'hm_omega', 'hm_psi']
+[prog] made=200 pos=200 neg=0 skip=1 err=0 51s (3.9/s)
+[prog] made=400 pos=400 neg=0 skip=1 err=0 101s (4.0/s)
+[prog] made=600 pos=600 neg=0 skip=1 err=0 156s (3.8/s)
+[prog] made=800 pos=800 neg=0 skip=1 err=0 210s (3.8/s)
+[prog] made=1000 pos=959 neg=41 skip=1 err=0 270s (3.7/s)
+[prog] made=1200 pos=959 neg=241 skip=1 err=0 333s (3.6/s)
+[prog] made=1400 pos=959 neg=441 skip=1 err=0 393s (3.6/s)
+[prog] made=1600 pos=959 neg=641 skip=1 err=0 450s (3.6/s)
+[prog] made=1800 pos=959 neg=841 skip=1 err=0 502s (3.6/s)
+[voices] 32: ['af_alloy', 'af_aoede', 'af_bella', 'af_heart', 'af_jessica', 'af_kore', 'af_nicole', 'af_nova', 'af_river', 'af_sarah', 'af_sky', 'am_adam', 'am_echo', 'am_eric', 'am_fenrir', 'am_liam', 'am_michael', 'am_onyx', 'am_puck', 'am_santa', 'bf_alice', 'bf_emma', 'bf_isabella', 'bf_lily', 'bm_daniel', 'bm_fable', 'bm_george', 'bm_lewis', 'hf_alpha', 'hf_beta', 'hm_omega', 'hm_psi']
+[prog] made=200 pos=0 neg=200 skip=1841 err=0 46s (4.4/s)
+[prog] made=400 pos=0 neg=400 skip=1841 err=0 96s (4.1/s)
+[prog] made=600 pos=0 neg=600 skip=1841 err=0 150s (4.0/s)
+[prog] made=800 pos=0 neg=800 skip=1841 err=0 192s (4.2/s)
+[prog] made=1000 pos=0 neg=1000 skip=1841 err=0 238s (4.2/s)
+[DONE] pos=0 neg=1167 skipped=1841 errors=0 elapsed=278s

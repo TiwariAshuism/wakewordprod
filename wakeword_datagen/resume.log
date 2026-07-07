@@ -1,0 +1,4 @@
+=== attempt 1, kokoro_neg_before=881 ===
+=== attempt 1 rc=0 kokoro_neg_after=2048 ===
+COMPLETED_CLEAN
+RESUME_LOOP_END kokoro_neg=2048

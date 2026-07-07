@@ -1,0 +1,13 @@
+  [POS] 'hey aura'                     made=297 skip=3 fail=0
+  [POS] 'hey Aura'                     made=0 skip=300 fail=0
+  [POS] 'heyy aura'                    made=297 skip=3 fail=0
+  [POS] 'hai aura'                     made=297 skip=3 fail=0
+  [POS] 'hey aurah'                    made=297 skip=3 fail=0
+  [POS] 'hey awra'                     made=297 skip=3 fail=0
+  [NEG] 'aura'                         made=118 skip=2 fail=0
+  [NEG] 'hey Dora'                     made=118 skip=2 fail=0
+  [NEG] 'hey Cora'                     made=118 skip=2 fail=0
+  [NEG] 'hey Nora'                     made=118 skip=2 fail=0
+  [NEG] 'hey Laura'                    made=118 skip=2 fail=0
+  [NEG] 'hey Aurora'                   made=118 skip=2 fail=0
+  [NEG] 'hey Ora'                      made=118 skip=2 fail=0

@@ -259,3 +259,32 @@ lightly-processed (not black-box-DSP'd) speech so real recordings match what the
 at inference. Pair it with a cheap (~$15) UAC USB-C lavalier to add "consumer mic" variety —
 robustness comes from *diverse* mics, not one perfect one. Capture at 48 kHz, downsample to
 16 kHz in software, and keep any hardware AGC/noise-suppression off or constant.
+
+---
+
+## 8. Multi-engine expansion (2026-07-08)
+
+Six additional TTS engines were trialed on top of the original
+espeak / gTTS / SAPI / piper set. All clips are 16 kHz mono PCM_16 and were
+merged into `dataset/hey_aura/{positives,negatives}`.
+
+**Worked (3 of 6) — 5,878 new clips added:**
+
+| Engine | License | Positives | Negatives | Total |
+|---|---|---:|---:|---:|
+| piper-sg (`pipergen-libritts`, Rhasspy Piper / LibriTTS) | MIT | 1,500 | 890 | 2,390 |
+| Kokoro-82M (`hexgrad/Kokoro-82M`, ran via CPU fallback) | Apache-2.0 | 960 | 2,048 | 3,008 |
+| indic-tts (`indictts`, AI4Bharat Indic-TTS) | MIT (AI4Bharat) | 60 | 420 | 480 |
+
+**Failed (3 of 6) — 0 clips:**
+
+| Engine | License | Reason |
+|---|---|---|
+| Parler-TTS | Apache-2.0 | Engine installed/ran, but no model weights obtained → 0 clips |
+| Bark (Suno) | MIT | Torch install did not finish in time → generation not reached |
+| IndicF5 (AI4Bharat) | CC-BY-4.0 (gated) | Install worked, model download blocked by HF gating → 0 clips |
+
+Kokoro adds strong multi-accent English (af/am/bf/bm/hf/hm voice families) and
+piper-sg contributes the bulk of the `en-us` positives; indic-tts adds native
+Hindi coverage. Parler / Bark / IndicF5 can be revisited once weights are
+obtained (Bark just needs the torch build to complete; IndicF5 needs HF gated-repo access).

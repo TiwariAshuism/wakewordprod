@@ -1,35 +1,10 @@
 {
-  "labels": [
-    "marvin",
-    "yes",
-    "no",
-    "up",
-    "down",
-    "left",
-    "right",
-    "on",
-    "off",
-    "stop",
-    "go",
-    "_unknown_",
-    "_silence_"
-  ],
-  "marvin_index": 0,
-  "num_classes": 13,
+  "wake_word": "hey aura",
   "arch": "dscnn",
-  "params": 15053,
-  "frontend": {
-    "sample_rate": 16000,
-    "win": 400,
-    "hop": 160,
-    "fft": 512,
-    "n_mels": 40,
-    "mel": "HTK",
-    "log": "natural",
-    "dsp": "AGC->AEC(noop)->NS",
-    "window_frames": 100
-  },
-  "val_accuracy_clean": 0.8631,
-  "marvin_f1_clean": 0.9211,
-  "note": "PLACEHOLDER Speech-Commands model (augmented, head-to-head winner), not the AURA-trained model."
+  "num_classes": 2,
+  "target_index": 1,
+  "labels": [
+    "not_wake",
+    "hey_aura"
+  ]
 }

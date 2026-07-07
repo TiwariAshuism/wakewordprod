@@ -22,3 +22,18 @@ wakeword_datagen/**/*.wav
 # Vendored native libs extracted from AARs (regenerated at build time)
 third_party/onnxruntime/lib/
 # NOTE: gradle/wrapper/gradle-wrapper.jar IS committed (v1) — do not ignore *.jar
+# TTS engines: isolated venvs + cloned repos + downloaded model weights (multi-GB, set up by
+# the multi-engine datagen workflow — Piper-sample-gen, Kokoro, Indic-TTS, etc.)
+wakeword_datagen/venvs/
+wakeword_datagen/piper-sample-generator/
+wakeword_datagen/**/*.onnx
+wakeword_datagen/**/*.pt
+wakeword_datagen/**/*.pth
+wakeword_datagen/**/*.tar*
+wakeword_datagen/**/*.mp3
+# Python cruft
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
