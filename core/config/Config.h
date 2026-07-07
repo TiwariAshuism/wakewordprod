@@ -44,12 +44,13 @@ struct DetectConfig {
   float stage1Threshold = 0.5f;   // per-window score >= threshold counts as a positive window
                                   // (operating point chosen from the DET sweep: clean TP 83% /
                                   //  noisy TP 77% at ~0% FP; tools/verify_kws_host.py)
-  int stage1ConsecutiveWindows = 3;  // require M consecutive positive windows before firing
-                                     // (posterior smoothing — kills transient-noise false accepts)
+  int stage1ConsecutiveWindows = 2;  // require M consecutive positive windows before firing
+                                     // (posterior smoothing; M=2 for the hey-m model — the
+                                     //  benchmark showed M=3 is over-conservative here)
   int refractoryFrames = 100;     // suppress re-fire for N frames (~1s) after a detection
                                   // (one spoken wake word => one detection, not a rapid double)
-  int stage1NumClasses = 13;      // placeholder KWS model output classes (labels.json: 11 words + unknown + silence)
-  int stage1TargetClass = 0;      // "marvin" class index (tools/train_kws_model.py -> labels.json)
+  int stage1NumClasses = 2;       // hey-m model: 2-class {not-wake, hey-m} (tools/heym_train.py)
+  int stage1TargetClass = 1;      // "hey m" class index
   bool softmaxOutput = true;      // model emits logits -> softmax; else raw prob
 
   // --- Stage-2 verifier (two-stage cascade, Stage 7 §3.11/§7.3) ---
@@ -65,13 +66,13 @@ struct DetectConfig {
   // quantify. The infra + tests are in place; flip this on when it's measurably justified.
   bool stage2Enabled = false;
   float stage2Threshold = 0.5f;   // Stage-2 softmax[target] gate
-  int stage2NumClasses = 13;
-  int stage2TargetClass = 0;
+  int stage2NumClasses = 2;
+  int stage2TargetClass = 1;
 };
 
 struct ModelConfig {
-  std::string stage1ModelFile = "kws_marvin.onnx";          // Stage-1 (always-on, tiny) — dscnn
-  std::string stage2ModelFile = "kws_marvin_stage2.onnx";   // Stage-2 (verifier) — cnn
+  std::string stage1ModelFile = "heym.onnx";          // Stage-1 (always-on, tiny) — dscnn (hey-m)
+  std::string stage2ModelFile = "heym_stage2.onnx";   // Stage-2 (verifier) — cnn (hey-m)
   std::string vadModelFile = "silero_vad.onnx";
   std::string stage1WakeWord = "marvin";
 };

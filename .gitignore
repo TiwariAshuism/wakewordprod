@@ -12,4 +12,13 @@ apps/android/src/main/assets/models/*.onnx
 apps/android/src/main/assets/models/*.pt
 # Speech Commands dataset (~2.3GB) downloaded by tools/train_kws_model.py
 .data/
+# Wake-word audio datasets + generated TTS clips + Piper voice models (large, regenerable
+# via wakeword_datagen/run_all.py). Real recordings live outside git or in DVC.
+dataset/
+wakeword_datagen/output/
+wakeword_datagen/models/
+wakeword_datagen/**/*.wav
+*.wav
+# Vendored native libs extracted from AARs (regenerated at build time)
+third_party/onnxruntime/lib/
 # NOTE: gradle/wrapper/gradle-wrapper.jar IS committed (v1) — do not ignore *.jar

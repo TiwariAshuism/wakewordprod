@@ -11,6 +11,8 @@
 #include <cstring>
 #include <vector>
 
+#include "core/common/noalloc.h"  // ScopedAllowAllocGuard (ORT allocation boundary)
+
 namespace aura::vad {
 
 namespace {
@@ -70,6 +72,11 @@ float SileroVad::process(const float* samples, size_t n) {
     i += static_cast<size_t>(take);
     if (im.chunkFill < kChunk) break;
     im.chunkFill = 0;
+
+    // Silero runs its own ONNX Runtime session; Run() allocates internally. This is on the
+    // audio hot path (under WakeWordEngine's ScopedNoAllocGuard), so mark the ORT boundary
+    // as an allowed allocation site (same as OnnxRuntimeBackend::infer) — device-only abort.
+    common::ScopedAllowAllocGuard allow;
 
     const std::array<int64_t, 2> inShape{1, kChunk};
     const std::array<int64_t, 3> stShape{2, 1, 128};

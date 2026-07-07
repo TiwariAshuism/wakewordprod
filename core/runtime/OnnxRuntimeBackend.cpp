@@ -14,6 +14,8 @@
 #include <string>
 #include <vector>
 
+#include "core/common/noalloc.h"  // ScopedAllowAllocGuard (ORT allocation boundary)
+
 namespace aura::runtime {
 
 using common::Arena;
@@ -92,6 +94,14 @@ Result<void> OnnxRuntimeBackend::loadModel(const ModelHandle& model) {
 
 Result<TensorView> OnnxRuntimeBackend::infer(const TensorView& input, Arena& scratchArena) {
   if (!impl_->session) return Err(ErrorCode::kFailedPrecondition, "no model loaded");
+
+  // ONNX Runtime's Run() allocates internally (input/output OrtValues, EP scratch) — an
+  // unavoidable third-party allocation boundary. The inference thread runs under a
+  // ScopedNoAllocGuard (WakeWordEngine §6), which would abort() on those allocations (this
+  // is a device-only crash: the host build stubs ORT out). Mark the ORT call as an allowed
+  // allocation site, so the guard still protects our own steady-state hot path.
+  // TODO(perf): eliminate with ORT IoBinding + pre-allocated OrtValues for true zero-alloc.
+  common::ScopedAllowAllocGuard allow;
 
   const int64_t n = input.elementCount();
   // Feed the flat input data using the model's declared shape (fixing any dynamic

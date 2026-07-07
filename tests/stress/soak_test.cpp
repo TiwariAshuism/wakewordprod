@@ -46,6 +46,9 @@ TEST(Soak, StableOverManyUtterances) {
   }
 
   auto cfg = std::make_shared<config::Config>();
+  // Pin the smoothing this soak scenario was tuned for (exactly 1 fire per synthetic utterance),
+  // independent of the shipping default (which tracks the current model, e.g. hey-m M=2).
+  cfg->detect.stage1ConsecutiveWindows = 3;
   test::MockPlatform p(".");
   Counter c;
   auto backend = std::make_unique<test::FakeInferenceBackend>(
