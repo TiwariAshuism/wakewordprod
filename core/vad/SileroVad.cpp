@@ -17,6 +17,8 @@ namespace aura::vad {
 
 namespace {
 constexpr int kChunk = 512;      // Silero v5 native chunk @ 16 kHz
+constexpr int kContext = 64;     // v5 prepends 64 samples of prior context (else prob==0!)
+constexpr int kInput = kChunk + kContext;  // actual model input length = 576
 constexpr int kStateSize = 2 * 1 * 128;  // [2,1,128]
 }  // namespace
 
@@ -28,6 +30,8 @@ struct SileroVad::Impl {
 
   std::vector<float> state;      // [2,1,128], persists across calls
   std::vector<float> chunk;      // 512-sample accumulation buffer
+  std::vector<float> context;    // last 64 samples of prior input (Silero context)
+  std::vector<float> inBuf;      // [context(64) ++ chunk(512)] = 576, reused each call
   int chunkFill = 0;
   int64_t sampleRate = 16000;
   float lastProb = 0.0f;
@@ -49,6 +53,8 @@ std::unique_ptr<SileroVad> SileroVad::Create(const common::ModelHandle& model, i
   }
   impl->state.assign(kStateSize, 0.0f);
   impl->chunk.assign(kChunk, 0.0f);
+  impl->context.assign(kContext, 0.0f);
+  impl->inBuf.assign(kInput, 0.0f);
   impl->sampleRate = sampleRate;
   return std::unique_ptr<SileroVad>(new SileroVad(std::move(impl)));
 }
@@ -58,6 +64,7 @@ SileroVad::~SileroVad() = default;
 
 void SileroVad::reset() {
   std::fill(impl_->state.begin(), impl_->state.end(), 0.0f);
+  std::fill(impl_->context.begin(), impl_->context.end(), 0.0f);
   impl_->chunkFill = 0;
   impl_->lastProb = 0.0f;
 }
@@ -78,12 +85,19 @@ float SileroVad::process(const float* samples, size_t n) {
     // as an allowed allocation site (same as OnnxRuntimeBackend::infer) — device-only abort.
     common::ScopedAllowAllocGuard allow;
 
-    const std::array<int64_t, 2> inShape{1, kChunk};
+    // Silero v5 input = [context(64) ++ new_chunk(512)] = 576 samples; context is the last
+    // 64 samples of the previous input, carried across calls. Feeding only the 512 (no
+    // context) makes the model output ~0 for all audio — the on-device no-detection bug.
+    std::memcpy(im.inBuf.data(), im.context.data(), kContext * sizeof(float));
+    std::memcpy(im.inBuf.data() + kContext, im.chunk.data(), kChunk * sizeof(float));
+    std::memcpy(im.context.data(), im.inBuf.data() + kInput - kContext, kContext * sizeof(float));
+
+    const std::array<int64_t, 2> inShape{1, kInput};
     const std::array<int64_t, 3> stShape{2, 1, 128};
     const std::array<int64_t, 1> srShape{1};
 
     Ort::Value input = Ort::Value::CreateTensor<float>(
-        im.memInfo, im.chunk.data(), im.chunk.size(), inShape.data(), inShape.size());
+        im.memInfo, im.inBuf.data(), im.inBuf.size(), inShape.data(), inShape.size());
     Ort::Value stateV = Ort::Value::CreateTensor<float>(
         im.memInfo, im.state.data(), im.state.size(), stShape.data(), stShape.size());
     Ort::Value sr = Ort::Value::CreateTensor<int64_t>(

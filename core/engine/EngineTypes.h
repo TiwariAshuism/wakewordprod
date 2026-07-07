@@ -23,7 +23,7 @@ struct EngineOptions {
 
 // One configured wake word (IWakeWordEngine::addWakeWord).
 struct WakeWordSpec {
-  std::string id;          // stable identifier (e.g. "marvin")
+  std::string id;          // stable identifier (e.g. "hey aura")
   std::string phrase;      // human-readable phrase
   float threshold = 0.6f;  // per-word Stage-1 threshold override
 };

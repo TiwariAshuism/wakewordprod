@@ -18,8 +18,8 @@ import kotlinx.coroutines.flow.callbackFlow
  * ```
  * val engine = AuraEngine(context.filesDir.absolutePath)
  * engine.initialize(modelDir)
- * engine.addWakeWord("marvin")
- * lifecycleScope.launch { engine.detections().collect { toast("marvin!") } }
+ * engine.addWakeWord("hey aura")
+ * lifecycleScope.launch { engine.detections().collect { toast("hey aura!") } }
  * engine.start()
  * ```
  */

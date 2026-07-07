@@ -41,16 +41,17 @@ struct VadConfig {
 struct DetectConfig {
   int stage1WindowFrames = 100;   // log-Mel frames per Stage-1 inference window (~1 s)
   int stage1HopFrames = 10;       // slide the window every N frames
-  float stage1Threshold = 0.5f;   // per-window score >= threshold counts as a positive window
-                                  // (operating point chosen from the DET sweep: clean TP 83% /
-                                  //  noisy TP 77% at ~0% FP; tools/verify_kws_host.py)
-  int stage1ConsecutiveWindows = 2;  // require M consecutive positive windows before firing
-                                     // (posterior smoothing; M=2 for the hey-m model — the
-                                     //  benchmark showed M=3 is over-conservative here)
+  float stage1Threshold = 0.45f;  // Stage-1 gate (kept low-ish for recall on marginal live
+                                  // scores); Stage-2 cascade below does the FA filtering.
+  int stage1ConsecutiveWindows = 1;  // require M consecutive positive windows before firing
+                                     // (M=1 for the hey-aura model: on-device live speech scores
+                                     //  are marginal ~0.5-0.76 and oscillate, so M>=2 never
+                                     //  confirms; benchmark already flagged M-of-N as
+                                     //  over-conservative here. Trade: slightly higher FA.)
   int refractoryFrames = 100;     // suppress re-fire for N frames (~1s) after a detection
                                   // (one spoken wake word => one detection, not a rapid double)
-  int stage1NumClasses = 2;       // hey-m model: 2-class {not-wake, hey-m} (tools/heym_train.py)
-  int stage1TargetClass = 1;      // "hey m" class index
+  int stage1NumClasses = 2;       // hey-aura model: 2-class {not-wake, hey-aura} (tools/heym_train.py)
+  int stage1TargetClass = 1;      // "hey aura" class index
   bool softmaxOutput = true;      // model emits logits -> softmax; else raw prob
 
   // --- Stage-2 verifier (two-stage cascade, Stage 7 §3.11/§7.3) ---
@@ -64,17 +65,20 @@ struct DetectConfig {
   // when Stage-1 is a cheaper/noisier always-on model (FP to filter, or a power win from
   // a tiny always-on + accurate on-demand model) — which needs the benchmark harness to
   // quantify. The infra + tests are in place; flip this on when it's measurably justified.
-  bool stage2Enabled = false;
+  bool stage2Enabled = false;     // OFF: on the user's off-distribution live voice the Stage-2
+                                  // verifier (same training data) rejects real "hey aura" too — it
+                                  // makes correlated errors, so it kills recall. Re-enable once
+                                  // Stage-2 is retrained to be genuinely independent/stronger.
   float stage2Threshold = 0.5f;   // Stage-2 softmax[target] gate
   int stage2NumClasses = 2;
   int stage2TargetClass = 1;
 };
 
 struct ModelConfig {
-  std::string stage1ModelFile = "heym.onnx";          // Stage-1 (always-on, tiny) — dscnn (hey-m)
-  std::string stage2ModelFile = "heym_stage2.onnx";   // Stage-2 (verifier) — cnn (hey-m)
+  std::string stage1ModelFile = "aura.onnx";          // Stage-1 (always-on, tiny) — dscnn (hey-aura)
+  std::string stage2ModelFile = "aura_stage2.onnx";   // Stage-2 (verifier) — cnn (hey-aura)
   std::string vadModelFile = "silero_vad.onnx";
-  std::string stage1WakeWord = "marvin";
+  std::string stage1WakeWord = "hey aura";
 };
 
 struct AudioConfig {

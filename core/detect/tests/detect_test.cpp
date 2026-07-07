@@ -23,7 +23,7 @@ TEST(Detect, FiresOnceWithCorrelationId) {
   config::DetectConfig dc;
   dc.stage1WindowFrames = 20;
   dc.stage1NumClasses = 4;         // match the FakeInferenceBackend below
-  dc.stage1TargetClass = 1;        // (independent of the app's default marvin index)
+  dc.stage1TargetClass = 1;        // (independent of the app's default hey-aura index)
   dc.stage1ConsecutiveWindows = 1;  // these tests exercise single-window cascade mechanics
   dc.stage1HopFrames = 5;
   // peak-based fake: mel value 2.0 => peak 2.0 > gate 0 => fire.
@@ -50,7 +50,7 @@ TEST(Detect, NoFireWhenNoSpeech) {
   config::DetectConfig dc;
   dc.stage1WindowFrames = 20;
   dc.stage1NumClasses = 4;         // match the FakeInferenceBackend below
-  dc.stage1TargetClass = 1;        // (independent of the app's default marvin index)
+  dc.stage1TargetClass = 1;        // (independent of the app's default hey-aura index)
   dc.stage1ConsecutiveWindows = 1;  // these tests exercise single-window cascade mechanics
   test::FakeInferenceBackend fake(4, 1, 0.0f);
   detect::Stage1Detector det(fake, dc, nMels, 0);
@@ -66,7 +66,7 @@ TEST(Detect, RejectsLowEnergyWindow) {
   config::DetectConfig dc;
   dc.stage1WindowFrames = 20;
   dc.stage1NumClasses = 4;         // match the FakeInferenceBackend below
-  dc.stage1TargetClass = 1;        // (independent of the app's default marvin index)
+  dc.stage1TargetClass = 1;        // (independent of the app's default hey-aura index)
   dc.stage1ConsecutiveWindows = 1;  // these tests exercise single-window cascade mechanics
   test::FakeInferenceBackend fake(4, 1, 0.0f);  // needs peak > 0
   detect::Stage1Detector det(fake, dc, nMels, 0);

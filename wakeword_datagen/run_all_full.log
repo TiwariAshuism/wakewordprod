@@ -1,0 +1,20 @@
+C:\Users\Ashu\Documents\wakewordprod\tools\aura_augment.py:29: WavFileWarning: Chunk (non-data) not understood, skipping it.
+  _, data = wavfile.read(os.path.join(nd, fn))
+== wake-word datagen == limit=None aug_k=2
+
+[OK ] espeak  made=2262 skipped=  87 failed=   0 (160.8s)
+[OK ] sapi    made= 162 skipped=  12 failed=   0 (21.4s)
+[OK ] gtts    made= 417 skipped= 188 failed=   4 (244.5s)
+[OK ] piper   made= 158 skipped=  12 failed=   4 (214.7s)
+
+-- augment --
+[OK ] augment made=5435 skipped=949 failed=0 k=2 noise=_background_noise_ (6 clips) sources=3192
+
+== per-engine WAV counts on disk ==
+  espeak   positives= 1458  negatives= 5346
+  gtts     positives=  378  negatives= 1386
+  piper    positives=  108  negatives=  396
+  sapi     positives=  108  negatives=  396
+  TOTAL    positives= 2052  negatives= 7524
+
+functional engines: ['espeak', 'sapi', 'gtts', 'piper']

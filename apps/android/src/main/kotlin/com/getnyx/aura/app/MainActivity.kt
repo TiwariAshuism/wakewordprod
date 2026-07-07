@@ -1,6 +1,6 @@
 // PROJECT AURA — reference app entry point (Stage 7 §1). Requests mic permission,
 // copies bundled placeholder models to the app files dir, starts the engine, and
-// shows a toast + logcat line ("marvin detected") on each detection event.
+// shows a toast + logcat line ("hey aura detected") on each detection event.
 package com.getnyx.aura.app
 
 import android.Manifest
@@ -24,7 +24,7 @@ class MainActivity : Activity() {
     private companion object {
         const val TAG = "AURA"
         const val REQ_MIC = 1001
-        val MODEL_ASSETS = listOf("heym.onnx", "heym_stage2.onnx", "silero_vad.onnx")
+        val MODEL_ASSETS = listOf("aura.onnx", "aura_stage2.onnx", "silero_vad.onnx")
     }
 
     private var engine: AuraEngine? = null
@@ -34,7 +34,7 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         status = TextView(this).apply {
-            text = "AURA — say \"marvin\""
+            text = "AURA — say \"hey aura\""
             gravity = Gravity.CENTER
             textSize = 22f
         }
@@ -74,13 +74,13 @@ class MainActivity : Activity() {
             Log.e(TAG, "initialize() failed — see 'no modelDir'/model-load logs")
             return
         }
-        eng.addWakeWord("marvin")
+        eng.addWakeWord("hey aura")
 
         // Collect detections on the main scope; the SDK Flow is fed from the
         // engine's Callback thread (Stage 7 §4), so UI work here is safe.
         scope.launch {
             eng.detections().collect { ev ->
-                val msg = "marvin detected (conf=%.2f)".format(ev.confidence)
+                val msg = "hey aura detected (conf=%.2f)".format(ev.confidence)
                 Log.i(TAG, "$msg cid=${ev.correlationId} ts=${ev.timestampNanos}")
                 Toast.makeText(this@MainActivity, msg, Toast.LENGTH_SHORT).show()
                 status.text = msg
@@ -88,7 +88,7 @@ class MainActivity : Activity() {
         }
 
         if (eng.start()) {
-            status.text = "Listening — say \"marvin\""
+            status.text = "Listening — say \"hey aura\""
             Log.i(TAG, "engine started")
         } else {
             status.text = "Engine start failed"

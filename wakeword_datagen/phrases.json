@@ -1,0 +1,11 @@
+{
+  "wake_word": "hey aura",
+  "positives": ["hey aura", "hey Aura", "heyy aura", "hai aura", "hey aurah", "hey awra"],
+  "hard_negatives": ["aura", "hey Dora", "hey Cora", "hey Nora", "hey Laura", "hey Aurora", "hey Ora", "hey hour", "hey Sara", "hey Farah", "hora", "Torah", "hey are you", "hey oughta", "hey Maura", "ora"],
+  "generic_negatives": ["hello", "mango", "hello mango", "okay google", "good morning", "what time is it", "turn on the light", "play music", "yes", "no", "stop", "how are you", "thank you", "hey there", "hey google", "alexa"],
+  "espeak_accents": ["en-us", "en-gb", "en-gb-x-rp", "en-gb-scotland", "en-gb-x-gbclan", "en-029", "hi", "ta", "te", "bn", "mr", "gu", "kn", "ml"],
+  "gtts_accents": [["en","com","US"],["en","co.uk","UK"],["en","co.in","IN"],["en","com.au","AU"],["en","ca","CA"],["en","ie","IE"],["en","co.za","ZA"],["hi","co.in","hi-IN"],["ta","co.in","ta-IN"],["te","co.in","te-IN"],["bn","co.in","bn-IN"],["mr","co.in","mr-IN"]],
+  "speeds": [0.8, 0.9, 1.0, 1.1, 1.2],
+  "espeak_pitches": [30, 45, 60, 75],
+  "espeak_speeds_wpm": [120, 145, 170, 195]
+}
