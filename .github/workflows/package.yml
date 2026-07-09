@@ -1,0 +1,106 @@
+# AURA — SaaS delivery. Manually turn a customer's labelled dataset into a versioned,
+# signed, drop-in Android model bundle (dist/<wake_word>_v<version>.zip) and upload it as
+# a build artifact. Run from the Actions tab: "Run workflow" and fill the inputs.
+#
+# The dataset is fetched at run time (not committed): provide a URL to a .zip whose root
+# contains positive/ and negative/ folders of 16 kHz mono .wav files. Optional bundle
+# signing uses the repo secret BUNDLE_SIGN_KEY (Settings -> Secrets -> Actions).
+name: aura-package
+
+on:
+  workflow_dispatch:
+    inputs:
+      wake_word:
+        description: 'Wake phrase, e.g. "hey nova"'
+        required: true
+      dataset_url:
+        description: 'URL to a dataset .zip (root has positive/ and negative/ *.wav)'
+        required: true
+      customer:
+        description: 'Customer name (watermarked into the bundle)'
+        required: false
+        default: ''
+      version:
+        description: 'Release version tag (blank = today UTC yyyymmdd)'
+        required: false
+        default: ''
+      license_id:
+        description: 'License identifier recorded in the manifest'
+        required: false
+        default: ''
+      stage2:
+        description: 'Include the Stage-2 verifier cascade'
+        type: boolean
+        required: false
+        default: true
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+
+      - name: Install training + packaging deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install numpy scipy soundfile onnxruntime pyyaml
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Compute dataset slug
+        id: slug
+        run: |
+          slug=$(echo "${{ github.event.inputs.wake_word }}" | tr '[:upper:] ' '[:lower:]_' | tr -cd 'a-z0-9_')
+          echo "slug=$slug" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch + unpack customer dataset
+        run: |
+          set -e
+          mkdir -p "datasets/${{ steps.slug.outputs.slug }}"
+          curl -fSL "${{ github.event.inputs.dataset_url }}" -o /tmp/dataset.zip
+          unzip -q /tmp/dataset.zip -d "datasets/${{ steps.slug.outputs.slug }}"
+          echo "Dataset layout:"; find "datasets/${{ steps.slug.outputs.slug }}" -maxdepth 2 -type d
+          test -d "datasets/${{ steps.slug.outputs.slug }}/positive" || { echo "::error::missing positive/ folder in dataset zip"; exit 1; }
+          test -d "datasets/${{ steps.slug.outputs.slug }}/negative" || { echo "::error::missing negative/ folder in dataset zip"; exit 1; }
+
+      - name: Write signing key (if secret is set)
+        id: sign
+        env:
+          BUNDLE_SIGN_KEY: ${{ secrets.BUNDLE_SIGN_KEY }}
+        run: |
+          if [ -n "$BUNDLE_SIGN_KEY" ]; then
+            printf '%s' "$BUNDLE_SIGN_KEY" > "$RUNNER_TEMP/bundle.key"
+            echo "arg=--sign-key $RUNNER_TEMP/bundle.key" >> "$GITHUB_OUTPUT"
+            echo "Bundle will be SIGNED."
+          else
+            echo "arg=" >> "$GITHUB_OUTPUT"
+            echo "No BUNDLE_SIGN_KEY secret — bundle will be unsigned."
+          fi
+
+      - name: Train -> calibrate -> evaluate -> bundle
+        run: |
+          python serve_train.py \
+            --wake-word "${{ github.event.inputs.wake_word }}" \
+            --data "datasets/${{ steps.slug.outputs.slug }}" \
+            ${{ github.event.inputs.customer != '' && format('--customer "{0}"', github.event.inputs.customer) || '' }} \
+            ${{ github.event.inputs.version  != '' && format('--version "{0}"',  github.event.inputs.version)  || '' }} \
+            ${{ github.event.inputs.license_id != '' && format('--license-id "{0}"', github.event.inputs.license_id) || '' }} \
+            ${{ github.event.inputs.stage2 == 'false' && '--no-stage2' || '' }} \
+            ${{ steps.sign.outputs.arg }}
+
+      - name: Verify the produced bundle(s)
+        run: |
+          for d in dist/*/; do
+            python -c "import sys,tools.bundle as b; sys.exit(0 if b.verify_bundle('$d') else 1)" \
+              && echo "verified: $d" || { echo "::error::verify_bundle failed for $d"; exit 1; }
+          done
+
+      - name: Upload deliverable bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: aura-bundle-${{ steps.slug.outputs.slug }}
+          path: |
+            dist/*.zip
+            dist/*/manifest.json
+          if-no-files-found: error

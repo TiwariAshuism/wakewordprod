@@ -1,11 +1,12 @@
-# PROJECT AURA — CI (Stage 7 §15 / §18). Per-commit: dependency-graph lint -> host
-# build+tests -> front-end alignment -> ASan -> SBOM; plus a best-effort Android
-# assembleDebug (Acceptance #1). Nightly lanes (HIL, benchmark, 7-day soak) are separate.
+# AURA — CI. Per-commit: dependency-graph lint -> host build+tests -> front-end
+# alignment -> ASan -> SBOM -> training-CLI smoke -> bundle-integrity self-test; plus a
+# best-effort Android assembleDebug. Nightly lanes (HIL, benchmark, soak) are separate.
 name: aura-ci
 
 on:
   push: { branches: [ main, master ] }
   pull_request: {}
+  workflow_dispatch: {}
 
 jobs:
   dep-lint:
@@ -14,7 +15,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: '3.12' }
-      # Stage 7 §2 row/PAL/cycle linter runs first — a forbidden import fails in seconds.
+      # Row/PAL/cycle linter runs first — a forbidden import fails in seconds.
       - run: python tools/lint_deps.py core
 
   host-tests:
@@ -48,7 +49,7 @@ jobs:
     needs: dep-lint
     steps:
       - uses: actions/checkout@v4
-      - name: Leak/UAF via AddressSanitizer (Stage 7 §14)
+      - name: Leak/UAF via AddressSanitizer
         run: bash tools/run_asan.sh
 
   sbom:
@@ -62,17 +63,69 @@ jobs:
       - uses: actions/upload-artifact@v4
         with: { name: sbom, path: sbom.json }
 
+  # Training entry points must at least import + parse (heavy deps are lazy-imported,
+  # so --help needs stdlib only). Catches breakage from tool refactors/renames fast.
+  cli-smoke:
+    runs-on: ubuntu-latest
+    needs: dep-lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: py_compile + --help for the training/delivery CLIs
+        run: |
+          python -m py_compile train.py evaluate.py serve_train.py tools/bundle.py
+          python train.py --help
+          python evaluate.py --help
+          python serve_train.py --help
+
+  # Guards the SaaS deliverable: builds a bundle from dummy artifacts and proves the
+  # manifest/sha256/zip work AND that verify_bundle catches a tampered byte. Stdlib only.
+  bundle-integrity:
+    runs-on: ubuntu-latest
+    needs: dep-lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: bundle build + verify + tamper-detection self-test
+        run: |
+          python - <<'PY'
+          import os, sys, json, tempfile
+          sys.path.insert(0, "tools")
+          import bundle
+          d = tempfile.mkdtemp()
+          out = os.path.join(d, "out"); os.makedirs(out)
+          open(os.path.join(out, "aura.onnx"), "wb").write(b"\x00" * 64)
+          open(os.path.join(out, "aura_stage2.onnx"), "wb").write(b"\x01" * 64)
+          json.dump({"wake_word": "citest", "num_classes": 2, "target_index": 1,
+                     "calibration": {"method": "none"}},
+                    open(os.path.join(out, "labels.json"), "w"))
+          key = os.path.join(d, "key.txt"); open(key, "w").write("deadbeef" * 8)
+          cfg = {"version": "citest", "customer": "ci", "license_id": "CI-1",
+                 "sign_key": key, "stage2": {"enabled": True}}
+          bdir, zpath = bundle.build_bundle(out, "citest", cfg, dist_root=os.path.join(d, "dist"))
+          assert os.path.isfile(os.path.join(bdir, "manifest.json")), "no manifest.json"
+          assert os.path.isfile(zpath), "no zip"
+          assert bundle.verify_bundle(bdir) is True, "clean verify_bundle failed"
+          p = os.path.join(bdir, "aura.onnx")
+          b = bytearray(open(p, "rb").read()); b[0] ^= 0xFF; open(p, "wb").write(b)
+          assert bundle.verify_bundle(bdir) is False, "tamper NOT detected"
+          print("bundle integrity self-test: PASS")
+          PY
+
   android-build:
     runs-on: ubuntu-latest
     needs: [ host-tests, frontend-alignment ]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
-        with: { distribution: temurin, java-version: '17' }   # JDK 17 (AGP 8.7 requires it)
+        with: { distribution: temurin, java-version: '21' }   # matches the dev JBR; AGP 8.7 supports 17-21
       - uses: android-actions/setup-android@v3
       - name: Install NDK + CMake
         run: sdkmanager "ndk;27.2.12479018" "cmake;3.22.1"
-      - name: assembleDebug (Acceptance #1)
-        # Placeholder models are git-ignored; the app degrades gracefully if absent, so the
-        # APK still assembles. A real run places kws_marvin*.onnx + silero_vad.onnx first.
+      - name: assembleDebug
+        # Model assets (aura*.onnx, silero_vad.onnx) are git-ignored; the app degrades
+        # gracefully if absent, so the APK still assembles. A real run ships a trained
+        # bundle's files into apps/android/src/main/assets/models/ first.
         run: ./gradlew :apps:android:assembleDebug
