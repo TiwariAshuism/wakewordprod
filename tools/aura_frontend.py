@@ -12,9 +12,9 @@ capture -> DSP(AGC -> AEC(no-op) -> NS) -> log-Mel, block-streamed in 160-sample
     (Hann-400 symmetric, FFT 512, |X|^2, HTK mel 40 [20,8000], natural log,
      win 400 / hop 160, center=False)
 
-Both tools/train_kws_model.py and tools/verify_kws_host.py import this, so the
-trained weights and the host verification use the identical front-end the device
-uses. tools/dump_frontend_check verifies numpy≈C++ on a test signal.
+The training flow (train.py -> tools/aura_train.py) imports this, so the trained
+weights use the identical front-end the device uses. tools/dump_frontend_check
+verifies numpy≈C++ on a test signal.
 """
 import numpy as np
 

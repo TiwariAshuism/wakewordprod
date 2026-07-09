@@ -1,0 +1,44 @@
+# ============================================================================
+#  Wake-word training config  —  the ONE file you edit for the easy flow.
+#
+#  Quickstart (see TRAINING.md):
+#    1. drop wavs into datasets/<wake_word>/positive and datasets/<wake_word>/negative
+#    2. edit `wake_word` + `dataset_dir` below
+#    3. python train.py
+#    4. python evaluate.py
+# ============================================================================
+
+# Name of the wake word you are training (used for labels + artifact naming).
+# e.g. "hey_aura", "hey_m". No spaces.
+wake_word: hey_aura
+
+# Folder holding your data, laid out as:
+#   <dataset_dir>/positive/*.wav   (clips that SAY the wake word)
+#   <dataset_dir>/negative/*.wav   (everything else: other speech, noise, confusables)
+# 16 kHz mono WAV. The split is speaker-independent (see datasets/README.md).
+dataset_dir: datasets/hey_aura
+
+# Where trained artifacts land (ONNX models + labels.json). Created if missing.
+output_dir: models
+
+# Training epochs for each stage. 25 is a good default; raise for more data.
+epochs: 25
+
+# Stage-1 architecture (the always-on detector). Options: dscnn | cnn | bcresnet.
+# dscnn is the shipped default (smallest, best FA/FR trade-off).
+arch: dscnn
+
+# Optional Stage-2 verifier cascade: a second, heavier model that must ALSO fire
+# to confirm a detection (cuts false accepts). Set enabled: false for Stage-1 only.
+stage2:
+  enabled: true
+  arch: cnn        # verifier architecture: cnn | bcresnet | dscnn
+
+# --- Front-end is FIXED to match the on-device C++ path (tools/aura_frontend.py). ---
+# Do not change unless the device DSP/feature extractor changes too.
+sample_rate: 16000     # Hz, mono
+# (log-Mel: 40 mels, win 400 / hop 160, 100-frame window — all fixed in aura_frontend.py)
+
+# Run confidence calibration after training (fits Platt/temperature, writes ECE/MCE and a
+# calibration block into labels.json). Needs held-out data; safe to leave true.
+calibrate: true

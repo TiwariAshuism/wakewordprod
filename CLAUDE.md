@@ -1,8 +1,14 @@
-## graphify
+# AURA Wake Word Engine
 
-This project has a graphify knowledge graph at graphify-out/.
+Cross-platform, on-device wake-word detection engine (Apache-2.0).
 
-Rules:
-- Before answering architecture or codebase questions, read graphify-out/GRAPH_REPORT.md for god nodes and community structure
-- If graphify-out/wiki/index.md exists, navigate it instead of reading raw files
-- After modifying code files in this session, run `graphify update .` to keep the graph current (AST-only, no API cost)
+## Layout
+- `core/` — platform-independent C++ engine (dependency-row-linted)
+- `sdk/` — language bindings (Kotlin JNI + SDK)
+- `apps/` — reference apps (Android reference app)
+- `tests/`, `benchmarks/` — unit/golden tests and benchmark harness
+- `docs/` — model/dataset cards, device runbook, build report; `docs/design/` holds the SAS and design/ADR docs
+
+## Conventions
+- Keep the `core/` dependency rows clean; run `python tools/lint_deps.py core` before changes.
+- Build/test via CMake presets (host) and Gradle (Android) — see `README.md`.

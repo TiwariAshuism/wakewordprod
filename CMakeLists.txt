@@ -37,9 +37,11 @@ add_library(aura_common STATIC core/common/noalloc.cpp core/common/lockorder.cpp
 target_link_libraries(aura_common PUBLIC aura_flags)
 add_dependencies(aura_common aura_dep_lint)
 
-# Header-only modules as INTERFACE libs.
-add_library(aura_config INTERFACE)      # Row 0
-target_link_libraries(aura_config INTERFACE aura_common)
+# Row 0 config. Mostly header-only (Config.h) plus the dependency-free confidence-
+# calibration sidecar parser, so it is a STATIC (not INTERFACE) library.
+add_library(aura_config STATIC core/config/calibration_sidecar.cpp)  # Row 0
+target_link_libraries(aura_config PUBLIC aura_common)
+add_dependencies(aura_config aura_dep_lint)
 add_library(aura_platform INTERFACE)    # Row 0 (interfaces; impls are per-OS)
 target_link_libraries(aura_platform INTERFACE aura_common)
 add_library(aura_statemachine INTERFACE)  # Row 1
@@ -133,6 +135,7 @@ if(AURA_BUILD_TESTS AND NOT AURA_PLATFORM STREQUAL "android")
   add_executable(aura_tests
     core/common/tests/common_test.cpp
     core/config/tests/config_test.cpp
+    core/config/tests/calibration_sidecar_test.cpp
     core/statemachine/tests/statemachine_test.cpp
     core/audio/tests/audio_test.cpp
     core/dsp/tests/dsp_test.cpp

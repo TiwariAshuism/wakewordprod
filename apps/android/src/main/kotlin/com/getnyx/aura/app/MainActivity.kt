@@ -24,7 +24,7 @@ class MainActivity : Activity() {
     private companion object {
         const val TAG = "AURA"
         const val REQ_MIC = 1001
-        val MODEL_ASSETS = listOf("aura.onnx", "aura_stage2.onnx", "silero_vad.onnx")
+        val MODEL_ASSETS = listOf("aura.onnx", "aura_stage2.onnx", "silero_vad.onnx", "labels.json")
     }
 
     private var engine: AuraEngine? = null

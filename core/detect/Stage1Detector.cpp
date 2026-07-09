@@ -71,22 +71,48 @@ CorrelationId Stage1Detector::mintCorrelationId() {
   return CorrelationId{0xA0DA0000ull | wakeWordIndex_, idCounter_};
 }
 
-float Stage1Detector::scoreFromOutput(const TensorView& out, int /*numClasses*/,
-                                      int targetClass) const {
+namespace {
+// Post-hoc CONFIDENCE-calibration transform (posterior score scaling). NOT PTQ
+// 'quantization calibration' (which collects activation ranges for INT8) — same word,
+// unrelated mechanism. TEMPERATURE is applied earlier, on the logits inside the softmax
+// (softmax(logits / T)); this helper only handles the PLATT map p = sigmoid(a*z + b)
+// and is identity for kNone / kTemperature.
+float applyCalibration(float z, const config::StageCalibration& cal) {
+  if (cal.method == config::StageCalibration::kPlatt)
+    return 1.0f / (1.0f + std::exp(-(cal.plattA * z + cal.plattB)));
+  return z;  // kNone, or kTemperature (already applied pre-softmax) -> identity
+}
+}  // namespace
+
+float Stage1Detector::scoreFromOutput(const TensorView& out, int targetClass, bool softmax,
+                                      const config::StageCalibration& cal) {
   const int64_t n = out.shape[0];
   if (n <= 0 || out.data == nullptr) return 0.0f;
+  // TEMPERATURE divisor: only meaningful for the softmax/logit paths; guard T>0.
+  const float T = (cal.method == config::StageCalibration::kTemperature && cal.temperature > 0.0f)
+                      ? cal.temperature
+                      : 1.0f;
   if (n == 1) {  // single-logit / prob model
     const float v = out.data[0];
-    return v > 1.0f || v < 0.0f ? 1.0f / (1.0f + std::exp(-v)) : v;  // sigmoid if logit
+    if (v > 1.0f || v < 0.0f) {  // it's a logit
+      // PLATT: sigmoid(a*z + b) on the single logit; else TEMPERATURE-scaled sigmoid.
+      if (cal.method == config::StageCalibration::kPlatt) return applyCalibration(v, cal);
+      return 1.0f / (1.0f + std::exp(-(v / T)));
+    }
+    // Already a probability in [0,1]; Platt maps it via its logit form, temperature n/a.
+    return applyCalibration(v, cal);
   }
   const int target = std::clamp(targetClass, 0, static_cast<int>(n) - 1);
-  if (!cfg_.softmaxOutput) return std::clamp(out.data[target], 0.0f, 1.0f);
-  // softmax over classes, return target-class probability.
+  if (!softmax) return applyCalibration(std::clamp(out.data[target], 0.0f, 1.0f), cal);
+  // softmax(logits / T) over classes, return target-class probability (numerically
+  // stable: factor out exp(-maxLogit/T) in numerator and denominator).
   float maxLogit = out.data[0];
   for (int64_t i = 1; i < n; ++i) maxLogit = std::max(maxLogit, out.data[i]);
   float sum = 0.0f;
-  for (int64_t i = 0; i < n; ++i) sum += std::exp(out.data[i] - maxLogit);
-  return std::exp(out.data[target] - maxLogit) / std::max(sum, 1e-9f);
+  for (int64_t i = 0; i < n; ++i) sum += std::exp((out.data[i] - maxLogit) / T);
+  const float p = std::exp((out.data[target] - maxLogit) / T) / std::max(sum, 1e-9f);
+  // PLATT: post-softmax transform on the target probability.
+  return applyCalibration(p, cal);
 }
 
 void Stage1Detector::runStage1(uint64_t timestampNanos) {
@@ -116,7 +142,9 @@ void Stage1Detector::runStage1(uint64_t timestampNanos) {
     fsm_.dispatch(CascadeEvent::kStage1Rejected);
     return;
   }
-  lastScore_ = scoreFromOutput(out.value(), cfg_.stage1NumClasses, cfg_.stage1TargetClass);
+  // Confidence calibration applied per stage (cfg_.stage1Calibration) inside scoreFromOutput.
+  lastScore_ = scoreFromOutput(out.value(), cfg_.stage1TargetClass, cfg_.softmaxOutput,
+                               cfg_.stage1Calibration);
   lastTs_ = timestampNanos;
   {  // TEMP: Stage-1 score per gated window (diagnose live-voice recall) — remove after
     common::ScopedAllowAllocGuard allow;
@@ -176,7 +204,8 @@ void Stage1Detector::runStage2(uint64_t timestampNanos) {
     fsm_.dispatch(CascadeEvent::kStage2Rejected);
     return;
   }
-  const float s2 = scoreFromOutput(out.value(), cfg_.stage2NumClasses, cfg_.stage2TargetClass);
+  const float s2 = scoreFromOutput(out.value(), cfg_.stage2TargetClass, cfg_.softmaxOutput,
+                                   cfg_.stage2Calibration);
   if (s2 >= cfg_.stage2Threshold) {
     fsm_.dispatch(CascadeEvent::kStage2Fired);
     confirm(timestampNanos, s2);

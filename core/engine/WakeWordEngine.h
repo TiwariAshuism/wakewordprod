@@ -69,6 +69,10 @@ class WakeWordEngine final : public IWakeWordEngine {
 
   platform::IPlatform& platform_;
   std::shared_ptr<const config::Config> config_;
+  // Local, patchable copy of config_->detect: at init we overlay the model's
+  // labels.json CONFIDENCE-calibration onto it, then build the detector from this copy
+  // (the shared Config snapshot stays immutable). Identity when no sidecar is present.
+  config::DetectConfig detectCfg_{};
 
   scheduler::Scheduler scheduler_;
   std::unique_ptr<audio::AudioPipeline> audio_;

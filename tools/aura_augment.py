@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Waveform-domain augmentation for AURA KWS training robustness (ROBUSTNESS_IMPROVEMENTS
-#1). Applied BEFORE tools/aura_frontend.py features(), so it never touches the on-device
-front-end (alignment preserved). Seeded/reproducible.
+"""Waveform-domain augmentation for AURA KWS training robustness. Applied BEFORE
+tools/aura_frontend.py features(), so it never touches the on-device front-end
+(alignment preserved). Seeded/reproducible.
 
 Augmentations (each applied with a probability): speed perturbation (Ko et al.), gain
 jitter, time-shift, synthetic-RIR reverb (far-field), and additive background-noise mixing
 at an SNR curriculum. SpecAugment is applied online in the training loop (see
-train_kws_model.py), not here.
+tools/aura_train.py), not here.
 """
 import os
 import numpy as np

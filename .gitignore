@@ -38,3 +38,9 @@ __pycache__/
 .venv/
 venv/
 graphify-out/
+# Founder/internal artifacts — never committed (live outside the repo)
+*.xlsx
+*.pdf
+# Training data directory (large, regenerable). Keep only its README.
+datasets/
+!datasets/README.md

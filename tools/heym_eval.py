@@ -23,6 +23,7 @@ sys.path[:0] = [HERE, os.path.join(HERE, "..", "benchmarks", "harness")]
 import aura_frontend as fe
 import aura_augment as aug
 import heym_data
+import calibrate as cal  # calibration apply + ECE/MCE helpers
 from bench_kws import EnergyGate
 
 DATA = os.path.join(HERE, "..", ".data")
@@ -31,15 +32,20 @@ HOP = fe.HOP
 TARGET = 1
 
 
-def marv_scores(mel, sess, in_name, hop_pts, window=100):
+def marv_scores(mel, sess, in_name, hop_pts, window=100, calibration=None, stage="stage1"):
+    """Target-class posterior per hop window. If `calibration` (a labels.json calibration
+    block) is given, apply Platt sigmoid(a*z+b) or temperature softmax(z/T); else plain softmax."""
     out = np.zeros(len(hop_pts), np.float32)
     for i, t in enumerate(hop_pts):
         z = sess.run(None, {in_name: mel[t - window:t][None].astype(np.float32)})[0][0]
-        z = z - z.max(); e = np.exp(z); out[i] = (e / e.sum())[TARGET]
+        if calibration is not None:
+            out[i] = cal.apply_calibration(z, calibration, stage, TARGET)
+        else:
+            z = z - z.max(); e = np.exp(z); out[i] = (e / e.sum())[TARGET]
     return out
 
 
-def stream_prep(audio, sess1, in1, sess2, in2, window=100, hop=10):
+def stream_prep(audio, sess1, in1, sess2, in2, window=100, hop=10, calibration=None):
     dsp = fe.apply_dsp(audio); mel = fe.log_mel(dsp)
     T = len(mel)
     gate = EnergyGate(); go = np.zeros(max(T, 1), bool)
@@ -48,8 +54,9 @@ def stream_prep(audio, sess1, in1, sess2, in2, window=100, hop=10):
     hp = list(range(window, T + 1, hop))
     if not hp:
         return None
-    s1 = marv_scores(mel, sess1, in1, hp)
-    s2 = marv_scores(mel, sess2, in2, hp) if sess2 else np.ones(len(hp), np.float32)
+    s1 = marv_scores(mel, sess1, in1, hp, calibration=calibration, stage="stage1")
+    s2 = (marv_scores(mel, sess2, in2, hp, calibration=calibration, stage="stage2")
+          if sess2 else np.ones(len(hp), np.float32))
     return hp, s1, s2, go
 
 
@@ -98,6 +105,9 @@ def main():
     ap.add_argument("--stage1", default=os.path.join(DATA, "heym_dscnn.onnx"))
     ap.add_argument("--stage2", default="")   # optional verifier for the cascade
     ap.add_argument("--neg-seconds", type=int, default=900)
+    ap.add_argument("--calibration", default="",
+                    help="path to a labels.json with a 'calibration' block; applies it "
+                         "(Platt sigmoid(a*z+b) or softmax(z/T)) so FA/hr + ECE use calibrated scores")
     args = ap.parse_args()
     import onnxruntime as ort
     s1 = ort.InferenceSession(args.stage1, providers=["CPUExecutionProvider"]); i1 = s1.get_inputs()[0].name
@@ -105,20 +115,39 @@ def main():
     if args.stage2 and os.path.exists(args.stage2):
         s2 = ort.InferenceSession(args.stage2, providers=["CPUExecutionProvider"]); i2 = s2.get_inputs()[0].name
 
+    calibration = None
+    if args.calibration:
+        calibration = cal.load_calibration(args.calibration)
+        print(f"calibration: method={calibration.get('method')} from {args.calibration}")
+
     neg = realistic_negative(args.neg_seconds); neg_hours = len(neg) / fe.SR / 3600.0
-    neg_prep = stream_prep(neg, s1, i1, s2, i2)
+    neg_prep = stream_prep(neg, s1, i1, s2, i2, calibration=calibration)
     print(f"realistic negative corpus: {neg_hours*60:.1f} min  cascade={'yes' if s2 else 'no'}")
 
     pos = []
     for p, l, sp, a in heym_data.items("test"):
         if l == 1:
             padded = np.concatenate([np.zeros(int(0.5*fe.SR)), heym_data.read_wav(p), np.zeros(int(0.7*fe.SR))])
-            pos.append(stream_prep(padded, s1, i1, s2, i2))
+            pos.append(stream_prep(padded, s1, i1, s2, i2, calibration=calibration))
     conf = []
     for p, l, sp, a in heym_data.items("test"):
         if l == 0:
             padded = np.concatenate([np.zeros(int(0.5*fe.SR)), heym_data.read_wav(p), np.zeros(int(0.7*fe.SR))])
-            conf.append(stream_prep(padded, s1, i1, s2, i2))
+            conf.append(stream_prep(padded, s1, i1, s2, i2, calibration=calibration))
+
+    # ---- ECE / MCE (10-bin) on per-clip stage-1 posteriors (calibrated if --calibration) ----
+    cal_block = calibration or {"method": "none"}
+    ece_p, ece_y = [], []
+    for p, l, sp, a in heym_data.items("test"):
+        z = s1.run(None, {i1: fe.features(heym_data.read_wav(p), apply_dsp_chain=True)[None].astype(np.float32)})[0][0]
+        ece_p.append(cal.apply_calibration(z, cal_block, "stage1", TARGET))
+        ece_y.append(int(l))
+    ece_p = np.asarray(ece_p, np.float64); ece_y = np.asarray(ece_y, np.int64)
+    ece_val, mce_val, _ = cal.ece_mce(ece_p, ece_y)
+    brier_val = cal.brier(ece_p, ece_y); auroc_val = cal.auroc(ece_p, ece_y)
+    print(f"stage1 calibration quality (per-clip): ECE={ece_val:.4f} MCE={mce_val:.4f} "
+          f"Brier={brier_val:.4f} AUROC={auroc_val:.4f} "
+          f"(n_pos={int(ece_y.sum())}, n_neg={int((ece_y==0).sum())}, method={cal_block.get('method')})")
 
     ths = [0.5, 0.6, 0.7, 0.8, 0.9, 0.95]
     rows = []; best = None
@@ -160,7 +189,14 @@ def main():
         f.write("## Sweep (top by lowest FA/hr)\n\n| M | s1_thr | s2_thr | FA/hr | FRR | confusable-fire |\n|---|---|---|---|---|---|\n")
         for r in sorted(rows, key=lambda r: r[3])[:12]:
             f.write(f"| {r[0]} | {r[1]} | {r[2]} | {r[3]:.3f} | {r[4]:.3f} | {r[5]:.3f} |\n")
-        f.write("\n_FA/hr on realistic ambient+speech (audit methodology); confusable-fire is the "
+        f.write("\n## Stage-1 calibration quality (per-clip ECE/MCE)\n\n")
+        f.write(f"Measured on {int(ece_y.sum())} positive + {int((ece_y==0).sum())} negative "
+                "held-out test clips (single-window stage-1 posteriors). Calibration applied: "
+                f"**{cal_block.get('method', 'none')}**"
+                + (f" from `{args.calibration}`" if args.calibration else "") + ".\n\n")
+        f.write("| ECE (10-bin) | MCE | Brier | AUROC |\n|---|---|---|---|\n")
+        f.write(f"| {ece_val:.4f} | {mce_val:.4f} | {brier_val:.4f} | {auroc_val:.4f} |\n\n")
+        f.write("_FA/hr on realistic ambient+speech (audit methodology); confusable-fire is the "
                 "adversarial stress metric reported separately. en-IN-dominant data; en-US/GB/AU absent._\n")
     print(f"OP M={op[0]} s1={op[1]} s2={op[2]} FA/hr={op[3]:.3f} FRR={op[4]:.3f} confFire={op[5]:.3f} "
           f"size={size_kb:.1f}KB -> {os.path.join(DASH,'heym_report.md')}")

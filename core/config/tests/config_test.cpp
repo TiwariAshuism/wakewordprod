@@ -1,4 +1,5 @@
 // PROJECT AURA — core/config/tests/config_test.cpp
+#include "core/config/Config.h"
 #include "core/config/ConfigProvider.h"
 #include "core/config/DefaultConfigProvider.h"
 #include "tests/support/test_framework.h"
@@ -15,6 +16,19 @@ TEST(Config, DefaultsFullyPopulated) {
   EXPECT_EQ(cfg->features.sampleRate, 16000u);
   EXPECT_GT(cfg->detect.stage1WindowFrames, 0);
   EXPECT_TRUE(cfg->models.stage1WakeWord == "hey aura");
+}
+
+// New confidence-calibration fields default to identity => fully back-compatible.
+TEST(Config, CalibrationDefaultsToIdentity) {
+  DetectConfig dc;  // defaults
+  EXPECT_EQ(dc.stage1Calibration.method, StageCalibration::kNone);
+  EXPECT_NEAR(dc.stage1Calibration.temperature, 1.0f, 1e-9);
+  EXPECT_NEAR(dc.stage1Calibration.plattA, 1.0f, 1e-9);
+  EXPECT_NEAR(dc.stage1Calibration.plattB, 0.0f, 1e-9);
+  EXPECT_EQ(dc.stage2Calibration.method, StageCalibration::kNone);
+  EXPECT_NEAR(dc.stage2Calibration.temperature, 1.0f, 1e-9);
+  EXPECT_NEAR(dc.stage2Calibration.plattA, 1.0f, 1e-9);
+  EXPECT_NEAR(dc.stage2Calibration.plattB, 0.0f, 1e-9);
 }
 
 TEST(Config, SnapshotIsShared) {

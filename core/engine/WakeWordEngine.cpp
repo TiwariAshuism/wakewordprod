@@ -9,6 +9,7 @@
 
 #include "core/common/log.h"
 #include "core/common/noalloc.h"
+#include "core/config/calibration_sidecar.h"
 
 namespace aura::engine {
 
@@ -39,6 +40,10 @@ WakeWordEngine::~WakeWordEngine() { (void)stop(); }
 Result<void> WakeWordEngine::initialize(const EngineOptions& options) {
   synchronous_ = options.synchronousForTest;
 
+  // Start from the immutable snapshot's DetectConfig; we may overlay CONFIDENCE
+  // calibration parsed from the model's labels.json below. Identity if none.
+  detectCfg_ = config_->detect;
+
   // Load the Stage-1 model from storage (unless running with a pre-provisioned /
   // fake backend, i.e. empty modelDir).
   if (!options.modelDir.empty()) {
@@ -68,13 +73,29 @@ Result<void> WakeWordEngine::initialize(const EngineOptions& options) {
         stage2Backend_.reset();  // fall back to Stage-1-only
       }
     }
+
+    // Confidence-calibration sidecar (labels.json). Optional + tolerant: a missing or
+    // malformed file leaves detectCfg_ at identity calibration (no behavior change).
+    // (This is posterior confidence calibration, NOT PTQ 'quantization calibration'.)
+    auto cal = platform_.storage().mapReadOnly(options.modelDir / "labels.json");
+    if (cal) {
+      const auto parsed = config::parseCalibrationSidecar(
+          static_cast<const char*>(cal.value().data), cal.value().size);
+      detectCfg_.stage1Calibration = parsed.stage1;
+      detectCfg_.stage2Calibration = parsed.stage2;
+      platform_.storage().unmap(cal.value());
+      common::Log(LogLevel::kInfo, LogCategory::kModel, "confidence calibration loaded (labels.json)");
+    } else {
+      common::Log(LogLevel::kInfo, LogCategory::kModel,
+                  "no labels.json calibration; using identity confidence calibration");
+    }
   } else {
     common::Log(LogLevel::kInfo, LogCategory::kModel,
                 "no modelDir: assuming pre-provisioned/fake backend (test path)");
   }
 
   detector_ = std::make_unique<detect::Stage1Detector>(
-      *backend_, config_->detect, config_->features.nMels, /*wakeWordIndex=*/0,
+      *backend_, detectCfg_, config_->features.nMels, /*wakeWordIndex=*/0,
       stage2Backend_ ? stage2Backend_.get() : nullptr);
   detector_->setOnDetection([this](const common::DetectionEvent& ev) {
     enqueueCallback(CallbackMsg{CallbackMsg::Kind::kDetection, ev, {}, {}});

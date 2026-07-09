@@ -29,6 +29,7 @@ sys.path.insert(0, os.path.join(HERE, "..", "..", "tools"))
 import aura_frontend as fe
 import aura_augment as aug
 import sc_dataset
+import calibrate as cal  # calibration apply + ECE/MCE helpers
 
 ASSET = os.path.join(HERE, "..", "..", "apps", "android", "src", "main", "assets", "models")
 DASH = os.path.join(HERE, "..", "dashboards")
@@ -63,10 +64,15 @@ class EnergyGate:
         return (self.consec >= self.min_speech) or (self.hangc > 0)
 
 
-def precompute(mel, dsp_audio, sess, in_name, marvin_idx, window=100, hop_frames=10):
+def precompute(mel, dsp_audio, sess, in_name, marvin_idx, window=100, hop_frames=10,
+               calibration=None):
     """Compute, ONCE, the per-frame VAD gate and the marvin score at each hop window.
     The model has a fixed batch dim of 1, so windows are scored one at a time. Returns
-    (hop_pts, marv_scores, gate_open) — reusable across the whole threshold sweep."""
+    (hop_pts, marv_scores, gate_open) — reusable across the whole threshold sweep.
+
+    If `calibration` (a labels.json calibration block) is given, the target-class posterior
+    is calibrated (sigmoid(a*z+b) for Platt, or softmax(z/T) for temperature) so FA/hr is
+    re-measured WITH calibration; None -> plain softmax (identity)."""
     T = len(mel)
     gate = EnergyGate()
     gate_open = np.zeros(max(T, 1), dtype=bool)
@@ -78,9 +84,12 @@ def precompute(mel, dsp_audio, sess, in_name, marvin_idx, window=100, hop_frames
     for i, t in enumerate(hop_pts):
         w = mel[t - window:t][None].astype(np.float32)  # [1,100,40]
         z = sess.run(None, {in_name: w})[0][0]
-        z = z - z.max()
-        e = np.exp(z)
-        marv[i] = (e / e.sum())[marvin_idx]
+        if calibration is not None:
+            marv[i] = cal.apply_calibration(z, calibration, "stage1", marvin_idx)
+        else:
+            z = z - z.max()
+            e = np.exp(z)
+            marv[i] = (e / e.sum())[marvin_idx]
     return hop_pts, marv, gate_open
 
 
@@ -133,12 +142,20 @@ def main():
     ap.add_argument("--threshold", type=float, default=0.5)
     ap.add_argument("--consec", type=int, default=3,
                     help="M consecutive positive windows (posterior smoothing)")
+    ap.add_argument("--calibration", default="",
+                    help="path to a labels.json with a 'calibration' block; applies it "
+                         "(Platt sigmoid(a*z+b) or softmax(z/T)) so FA/hr + ECE use calibrated scores")
     args = ap.parse_args()
 
     import onnxruntime as ort
     labels = json.load(open(os.path.join(ASSET, "labels.json")))
     mi = labels["marvin_index"]
     onnx_path = os.path.join(ASSET, "kws_marvin.onnx")
+
+    calibration = None
+    if args.calibration:
+        calibration = cal.load_calibration(args.calibration)
+        print(f"calibration: method={calibration.get('method')} from {args.calibration}")
 
     # cold/warm load time
     t0 = time.perf_counter()
@@ -176,14 +193,41 @@ def main():
 
     # Precompute scores ONCE (expensive) then sweep thresholds (cheap).
     print("scoring negative corpus...")
-    neg_hp, neg_sc, neg_gate = precompute(neg_mel, neg_dsp, sess, in_name, mi)
+    neg_hp, neg_sc, neg_gate = precompute(neg_mel, neg_dsp, sess, in_name, mi,
+                                          calibration=calibration)
     print(f"scoring {len(marv_clips)} positive clips...")
     pos = []
     for x in marv_clips:
         pad = np.concatenate([np.zeros(int(0.4 * fe.SR)), x, np.zeros(int(0.6 * fe.SR))])
         d = fe.apply_dsp(pad)
         m = fe.log_mel(d)
-        pos.append(precompute(m, d, sess, in_name, mi))
+        pos.append(precompute(m, d, sess, in_name, mi, calibration=calibration))
+
+    # ---- ECE / MCE (10-bin) on per-clip posteriors (calibrated if --calibration) ----
+    # Positives = held-out marvin clips (label 1); negatives = a sample of non-marvin words
+    # (label 0). Each clip scored as a single 100-frame window.
+    ece_p, ece_y = [], []
+    for x in marv_clips:
+        z = sess.run(None, {in_name: fe.features(x, apply_dsp_chain=True)[None].astype(np.float32)})[0][0]
+        ece_p.append(cal.apply_calibration(z, calibration or {"method": "none"}, "stage1", mi))
+        ece_y.append(1)
+    neg_words = 0
+    for x, label in sc_dataset.iter_clips(root, "testing", shuffle_seed=11):
+        if label == "marvin":
+            continue
+        z = sess.run(None, {in_name: fe.features(x, apply_dsp_chain=True)[None].astype(np.float32)})[0][0]
+        ece_p.append(cal.apply_calibration(z, calibration or {"method": "none"}, "stage1", mi))
+        ece_y.append(0)
+        neg_words += 1
+        if neg_words >= max(len(marv_clips), 150):
+            break
+    ece_p = np.asarray(ece_p, np.float64); ece_y = np.asarray(ece_y, np.int64)
+    ece_val, mce_val, _ = cal.ece_mce(ece_p, ece_y)
+    brier_val = cal.brier(ece_p, ece_y)
+    auroc_val = cal.auroc(ece_p, ece_y)
+    print(f"calibration quality (per-clip): ECE={ece_val:.4f} MCE={mce_val:.4f} "
+          f"Brier={brier_val:.4f} AUROC={auroc_val:.4f} "
+          f"(n_pos={int(ece_y.sum())}, n_neg={int((ece_y==0).sum())})")
 
     thresholds = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
     consec_values = [1, 2, 3]  # posterior-smoothing strength (M-of-N)
@@ -226,6 +270,13 @@ def main():
                 "for this clean placeholder it is over-conservative. **Recommendation: lower M "
                 "toward 1-2 for this model** (a config decision, surfaced not auto-applied). "
                 "FRR is also inflated by short isolated 1 s clips vs the 1 s detection window.\n")
+        f.write("\n## Calibration quality (per-clip ECE/MCE)\n\n")
+        f.write(f"Measured on {int(ece_y.sum())} positive + {int((ece_y==0).sum())} negative "
+                "held-out clips (single-window posteriors). Calibration applied: "
+                f"**{(calibration or {}).get('method', 'none')}**"
+                + (f" from `{args.calibration}`" if args.calibration else "") + ".\n\n")
+        f.write("| ECE (10-bin) | MCE | Brier | AUROC |\n|---|---|---|---|\n")
+        f.write(f"| {ece_val:.4f} | {mce_val:.4f} | {brier_val:.4f} | {auroc_val:.4f} |\n")
         f.write("\n## Latency & load (HOST — not device-representative)\n\n")
         f.write(f"- inference latency (single 100x40 window): "
                 f"p50 {np.percentile(lat,50):.3f} ms, p95 {np.percentile(lat,95):.3f} ms, "

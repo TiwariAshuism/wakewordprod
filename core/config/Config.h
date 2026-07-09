@@ -38,6 +38,19 @@ struct VadConfig {
   int hangoverFrames = 8;         // keep gate open briefly after speech ends
 };
 
+// Per-stage CONFIDENCE calibration (posterior calibration): maps a raw model score
+// to a calibrated probability so the threshold operates on a well-scaled confidence.
+// This is NOT PTQ 'quantization calibration' (which collects activation ranges to
+// pick INT8 scales) — same word, unrelated mechanism. Identity defaults (method=none,
+// a=1, b=0, T=1) are a no-op, so pre-existing configs behave exactly as before.
+//   temperature : softmax(logits / T)          (T > 1 softens/lowers confidence)
+//   platt       : p = sigmoid(a * z + b)        (z = logit or post-softmax prob)
+struct StageCalibration {
+  enum Method { kNone, kTemperature, kPlatt } method = kNone;
+  float temperature = 1.0f;
+  float plattA = 1.0f, plattB = 0.0f;
+};
+
 struct DetectConfig {
   int stage1WindowFrames = 100;   // log-Mel frames per Stage-1 inference window (~1 s)
   int stage1HopFrames = 10;       // slide the window every N frames
@@ -72,6 +85,11 @@ struct DetectConfig {
   float stage2Threshold = 0.5f;   // Stage-2 softmax[target] gate
   int stage2NumClasses = 2;
   int stage2TargetClass = 1;
+
+  // Per-stage confidence calibration (see StageCalibration above). Identity by
+  // default => fully back-compatible. Populated at engine init from the model's
+  // labels.json sidecar (core/config/calibration_sidecar).
+  StageCalibration stage1Calibration{}, stage2Calibration{};
 };
 
 struct ModelConfig {

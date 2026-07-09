@@ -1,6 +1,8 @@
 // PROJECT AURA — core/detect/StreamingDetector.cpp
 #include "core/detect/StreamingDetector.h"
 
+#include <cmath>
+
 #include "core/common/log.h"
 #include "core/common/noalloc.h"
 
@@ -11,6 +13,29 @@ using common::DetectionEvent;
 using common::DetectionOutcome;
 using common::LogCategory;
 using common::LogLevel;
+
+namespace {
+// CONFIDENCE calibration for the streaming per-frame probability (posterior score
+// scaling). NOT PTQ 'quantization calibration' (INT8 activation ranges) — same word,
+// unrelated mechanism. The scorer yields a probability p in [0,1]: TEMPERATURE rescales
+// it via its logit (logit/T then sigmoid), PLATT maps sigmoid(a*p + b). Identity for
+// kNone, so an uncalibrated model behaves exactly as before.
+float calibrateStreamingScore(float p, const config::StageCalibration& cal) {
+  switch (cal.method) {
+    case config::StageCalibration::kTemperature: {
+      const float T = cal.temperature > 0.0f ? cal.temperature : 1.0f;
+      const float c = std::min(std::max(p, 1e-6f), 1.0f - 1e-6f);
+      const float logit = std::log(c / (1.0f - c));
+      return 1.0f / (1.0f + std::exp(-(logit / T)));
+    }
+    case config::StageCalibration::kPlatt:
+      return 1.0f / (1.0f + std::exp(-(cal.plattA * p + cal.plattB)));
+    case config::StageCalibration::kNone:
+    default:
+      return p;
+  }
+}
+}  // namespace
 
 StreamingDetector::StreamingDetector(IStreamingScorer& scorer,
                                      const config::DetectConfig& detectCfg,
@@ -46,7 +71,10 @@ void StreamingDetector::pushFrame(const float* mel, int nMels, uint64_t timestam
   // refractory window — so its recurrent/conv state never sees a gap. This is the
   // key difference from the windowed detector, which simply skips inference while
   // suppressed. NO re-windowing: exactly one score per frame.
-  const float score = scorer_.scoreFrame(mel, nMels);
+  // Calibrate the raw scorer output before it meets the threshold (mirrors the windowed
+  // Stage1Detector, which calibrates inside scoreFromOutput). The streaming model is the
+  // always-on Stage-1, so it uses stage1Calibration.
+  const float score = calibrateStreamingScore(scorer_.scoreFrame(mel, nMels), cfg_.stage1Calibration);
   lastScore_ = score;
 
   // Post-detection refractory: suppress re-fire for N frames so one spoken wake word

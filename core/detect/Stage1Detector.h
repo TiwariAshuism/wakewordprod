@@ -57,12 +57,20 @@ class Stage1Detector {
   void reset();
   CascadeState state() const { return fsm_.state(); }
 
+  // Map a raw backend output tensor to a calibrated confidence in [0,1], applying the
+  // stage's CONFIDENCE calibration (posterior score scaling) — TEMPERATURE softens
+  // the softmax (logits / T) and PLATT maps sigmoid(a*z + b). This is NOT PTQ
+  // 'quantization calibration' (INT8 activation ranges) — unrelated mechanism, same
+  // word. Public + static so it is directly unit-testable. `softmax` selects the
+  // multi-class softmax path (== cfg.softmaxOutput at the call sites).
+  static float scoreFromOutput(const common::TensorView& out, int targetClass, bool softmax,
+                               const config::StageCalibration& cal);
+
  private:
   common::CorrelationId mintCorrelationId();
   void runStage1(uint64_t timestampNanos);
   void runStage2(uint64_t timestampNanos);
   void confirm(uint64_t timestampNanos, float confidence);
-  float scoreFromOutput(const common::TensorView& out, int numClasses, int targetClass) const;
 
   runtime::IInferenceBackend& backend_;
   runtime::IInferenceBackend* stage2Backend_ = nullptr;
