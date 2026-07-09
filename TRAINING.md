@@ -47,6 +47,23 @@ Runs the streaming-detector mirror on the held-out (unseen-speaker) split and re
 **FA/hr**, **FRR**, and **ECE/MCE** calibration quality, writing
 `benchmarks/dashboards/<wake_word>_eval.md`.
 
+## Output: deliverable bundle
+
+After training, `train.py` packages the artifacts into a versioned, signed, ready-to-ship
+bundle under `dist/<wake_word>_v<version>/` (plus a matching `.zip`) via `tools/bundle.py`.
+Each bundle carries `aura.onnx` (+ optional `aura_stage2.onnx`), the fixed `silero_vad.onnx`,
+a calibrated `labels.json`, an `INTEGRATION.md` drop-in note, and a `manifest.json` with a
+per-file SHA-256 and an optional HMAC signature. Set `version` / `customer` / `license_id` /
+`sign_key` in `config.yaml` to version, watermark, license, and sign the bundle.
+
+For a one-command customer onboarding flow (dataset → trained, signed, deliverable bundle +
+a metrics report card), use **`serve_train.py`** — see **[SAAS.md](SAAS.md)**:
+
+```bash
+python serve_train.py --wake-word "hey nova" --data ./customer_dataset \
+    --customer acme --license-id ACME-2026-001 --sign-key keys/acme.key
+```
+
 ## Optional
 
 - **Calibration** — set `calibrate: true` in `config.yaml` to fit Platt/temperature

@@ -42,3 +42,19 @@ sample_rate: 16000     # Hz, mono
 # Run confidence calibration after training (fits Platt/temperature, writes ECE/MCE and a
 # calibration block into labels.json). Needs held-out data; safe to leave true.
 calibrate: true
+
+# --- SaaS delivery (optional) --------------------------------------------------------
+# After training, train.py packages a deployable, signed bundle into dist/<wake_word>_v<version>/
+# (+ .zip) via tools/bundle.py. All fields below are OPTIONAL — leave them blank/commented
+# for the simple flow (bundle is still produced, just unversioned/unsigned/unlicensed).
+#
+# version:     release tag for the bundle folder + manifest. Defaults to today's UTC date
+#              (YYYYMMDD) when unset.
+# customer:    customer name — stamped into the manifest + labels.json watermark (model_tag).
+# license_id:  license identifier recorded in the manifest.
+# sign_key:    path to a secret key file; when set, the manifest is signed (HMAC-SHA256).
+#
+# version: 1.0.0
+# customer:
+# license_id:
+# sign_key:

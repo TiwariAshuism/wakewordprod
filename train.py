@@ -230,6 +230,39 @@ def main():
     print(f"  cache  : {cache}")
     print(f"\nNext: python evaluate.py --config {os.path.relpath(args.config, HERE)}")
 
+    # ---- Deployable bundle (signed manifest + per-file integrity) ----
+    # Best-effort metrics gathered from training (+ calibration block, if any).
+    metrics = {}
+    try:
+        metrics["recall"] = round(float(m1.get("recall")), 6)
+        metrics["f1"] = round(float(m1.get("f1")), 6)
+        metrics["per_clip_far"] = round(float(m1.get("per_clip_far")), 6)
+    except (TypeError, ValueError):
+        pass
+    if stage2_on:
+        try:
+            metrics["stage2_recall"] = round(float(m2.get("recall")), 6)
+            metrics["stage2_f1"] = round(float(m2.get("f1")), 6)
+        except (TypeError, ValueError):
+            pass
+    try:
+        with open(labels_path, "r", encoding="utf-8") as f:
+            _final_labels = json.load(f)
+        _calib = _final_labels.get("calibration") or {}
+        if _calib:
+            metrics["calibration_method"] = _calib.get("method")
+    except Exception:
+        pass
+
+    try:
+        import bundle
+        bundle_dir, zip_path = bundle.build_bundle(
+            output_dir, wake_word, cfg, metrics=metrics or None)
+        print(f"  bundle dir: {os.path.relpath(bundle_dir, HERE)}")
+        print(f"Deliverable: {os.path.relpath(zip_path, HERE)}")
+    except Exception as e:
+        print(f"\n! bundle step skipped ({type(e).__name__}: {e})")
+
 
 if __name__ == "__main__":
     main()

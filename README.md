@@ -71,6 +71,9 @@ python evaluate.py
 (loader + speaker-independent split, the parity front-end, augmentation, model zoo,
 trainer, and calibration).
 
+**Ship it as a product:** `python serve_train.py` turns a customer dataset into a versioned,
+signed, deliverable bundle in one command — see **[SAAS.md](SAAS.md)** for the productization plan.
+
 ## Build
 
 **Host (C++ core — no Android toolchain needed):**

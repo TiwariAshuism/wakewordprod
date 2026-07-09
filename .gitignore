@@ -44,3 +44,7 @@ graphify-out/
 # Training data directory (large, regenerable). Keep only its README.
 datasets/
 !datasets/README.md
+# Deliverable customer bundles are build artifacts (produced by train.py / serve_train.py
+# via tools/bundle.py). Regenerable; keep the dir tracked via a .gitkeep placeholder.
+dist/*
+!dist/.gitkeep
